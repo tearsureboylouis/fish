@@ -187,6 +187,7 @@ class OpenProjectWindow(QWidget, OpenWindow):
 
         self.pushButton_save_path_r.clicked.connect(self.save_path_r)
         self.comboBox_body_r.currentTextChanged.connect(self.choose_window)
+        # self.comboBox_body_r.activated.connect(self.init_combox)
         self.pushButton_start_recording.clicked.connect(self.start_recording)
 
     def new_project(self):
@@ -291,9 +292,11 @@ class OpenProjectWindow(QWidget, OpenWindow):
     def init_combox(self):
         windows = gw.getAllTitles()
         self.open_windows = [window for window in windows if window]
+        # if not self.comboBox_body_r.currentData():
+        #     self.comboBox_body_r.clear()
         for i in self.open_windows:
             if len(i) > 40:
-                self.comboBox_body_r.addItem(i[:40] + "...")
+                self.comboBox_body_r.addItem(i[:30] + "...")
             else:
                 self.comboBox_body_r.addItem(i)
 
@@ -315,7 +318,22 @@ class OpenProjectWindow(QWidget, OpenWindow):
             'recording_window'] == "" or global_dict['water_depth'] == 0:
             QMessageBox.critical(self, "Error", "请输入项目信息！")
             return
+
+        path = os.path.join(global_dict['project_path'], global_dict['project_name'])
+        os.makedirs(path, exist_ok=True)
+        folder_name = ['video', 'data/metadata', 'data/results']
+        for i in folder_name:
+            os.makedirs(os.path.join(path, i), exist_ok=True)
+
+        global_dict['project_video'] = new_file_name = os.path.join(global_dict['project_path'],
+                                                                    global_dict['project_name'], 'video',
+                                                                    datetime.now().strftime('%Y%m%d') + '_' +
+                                                                    global_dict[
+                                                                        'project_name'] + '_row.mp4')
+        save_project_info(global_dict['project_name'], global_dict['project_path'], new_file_name)
+
         self.recordingWindow.show()
+        self.setEnabled(False)
 
 
 class VideoProcessingThread(QThread):
@@ -437,7 +455,8 @@ class RecordingThread(QThread):
         self.start_time = 0.0
 
     def run(self):
-        window.recordingWindow.button_function.setText("初始化中")
+        current_frame = 0
+        window.recordingWindow.label.setText('正在初始化中')
         window.recordingWindow.button_function.setEnabled(False)
         window.recordingWindow.close_button.setEnabled(False)
         _window = gw.getWindowsWithTitle(global_dict['recording_window'])[0]
@@ -449,7 +468,7 @@ class RecordingThread(QThread):
             _window.restore()
         _window.activate()  # 激活窗口，使其获得焦点
 
-        while True:
+        while not window.recordingWindow.isFinish:
             # 窗口的坐标和尺寸
 
             # 使用pyautogui捕获指定区域的屏幕
@@ -457,10 +476,15 @@ class RecordingThread(QThread):
             frame = np.array(screenshot)
             self.row_array.append(frame)
 
-            # 进行模型的预测
-            results = model.predict(source=frame, save=True, save_txt=True)
-            self.predict_array.append(results[0].plot())
+            frame_p = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
 
+            # 进行模型的预测
+            results = model.predict(source=frame_p, save=True, save_txt=True)
+            self.predict_array.append(results[0].plot())
+            save_path = os.path.join(global_dict['project_path'], global_dict['project_name'], 'data/metadata',
+                                     f"{current_frame}.txt")
+            results[0].save_txt(save_path)
+            current_frame += 1
             if self.isFirst:
                 window.recordingWindow.label.setText('请确保录制窗口无遮挡，3秒后开始录制')
                 time.sleep(1)
@@ -475,21 +499,32 @@ class RecordingThread(QThread):
                 window.recordingWindow.button_function.setText("结束录制")
                 window.recordingWindow.button_function.setEnabled(True)
 
-            if window.recordingWindow.isFinish:
-                break
+        window.recordingWindow.label.setText('正在处理数据中，请稍后…')
+        window.recordingWindow.button_function.setEnabled(False)
 
+        global_dict['duration'] = int(self.start_time - time.time())
         fps = float(len(self.row_array)) / (time.time() - self.start_time)
-        self.row_video = cv2.VideoWriter('row.mp4', fourcc, fps, (_window.width - 20, _window.height - 60))
-        self.predict_video = cv2.VideoWriter('predict.mp4', fourcc, fps,
+        self.row_video = cv2.VideoWriter(global_dict['project_video'], fourcc, fps,
+                                         (_window.width - 20, _window.height - 60))
+        self.predict_video = cv2.VideoWriter(global_dict['project_video'][:-7] + 'predict.mp4', fourcc, fps,
                                              (_window.width - 20, _window.height - 60))
         for frame in self.row_array:
-            frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-            self.row_video.write(frame)
+            frame_1 = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+            self.row_video.write(frame_1)
         for frame in self.predict_array:
-            frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
             self.predict_video.write(frame)
         self.row_video.release()
         self.predict_video.release()
+
+        base_path = os.path.join(global_dict['project_path'], global_dict['project_name'], 'data')
+        out_put_result(base_path, int(len(self.row_array)), int(fps), global_dict['duration'],
+                       global_dict['water_depth'])
+        split_files(base_path)
+        cluster_layers(base_path, global_dict['duration'], global_dict['water_depth'])
+
+        window.recordingWindow.label.setText('数据处理完成，请点击完成按钮')
+        window.recordingWindow.button_function.setText("完成")
+        window.recordingWindow.button_function.setEnabled(True)
 
 
 class RecordingWindow(QWidget):
@@ -500,6 +535,7 @@ class RecordingWindow(QWidget):
 
         self.setupUI()
         self.bind()
+        self.init()
 
         self.isFinish = False
 
@@ -513,7 +549,7 @@ class RecordingWindow(QWidget):
         v_layout = QVBoxLayout()
 
         font1 = QFont()
-        font1.setPointSize(12)
+        font1.setPointSize(10)
 
         # 创建顶部的水平布局
         top_layout = QHBoxLayout()
@@ -551,6 +587,9 @@ class RecordingWindow(QWidget):
     def bind(self):
         self.button_function.clicked.connect(self.functions)
 
+    def init(self):
+        pass
+
     def run_recording(self):
         self.thread = RecordingThread()
         self.thread.start()
@@ -560,7 +599,14 @@ class RecordingWindow(QWidget):
             self.run_recording()
         elif self.button_function.text() == "结束录制":
             self.isFinish = True
-            self.thread.quit()
+        elif self.button_function.text() == "完成":
+            shutil.rmtree('runs')
+            global_dict['xml_url'] = os.path.join(global_dict['project_path'], global_dict['project_name'],
+                                                  'data/output.xml')
+            window.other_window.initial_data()
+            window.other_window.show()
+            window.close()
+            self.close()
 
 
 class MainWindows(QWidget, MainWindow):
@@ -587,11 +633,12 @@ class MainWindows(QWidget, MainWindow):
                 self.video_path = os.path.join(self.video_path, f)
 
         self.video_capture = cv2.VideoCapture(self.video_path)
+        self.PFS = int(self.video_capture.get(cv2.CAP_PROP_FPS))
 
         self.is_paused = False
         self.timer = QTimer()
         self.timer.timeout.connect(self.update_frame)
-        self.timer.start(30)
+        self.timer.start(int(1000 / self.PFS - 33))  # 程序运行需要30ms左右
 
         base_url = global_dict['xml_url'].split('output.xml')[0]
         layer_count, total_count = get_layers_data(base_url)
@@ -648,6 +695,7 @@ class MainWindows(QWidget, MainWindow):
                 bytes_per_line = ch * w
                 qt_image = QImage(frame.data, w, h, bytes_per_line, QImage.Format_RGB888)
                 self.video_label.setPixmap(QPixmap.fromImage(qt_image))
+
             else:
                 self.video_capture.release()  # 释放捕捉
 

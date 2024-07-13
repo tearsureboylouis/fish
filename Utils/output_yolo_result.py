@@ -71,7 +71,7 @@ def out_put_result(base_path, total_frame, fps, duration, depth):
 
         """Fish Count Deep(sheet_depth_fish)，添加不同深度的鱼"""
         if frame_rate != 0 and current_ping % frame_rate == 0:
-            depth = (water_depth / row_video_duration) * (n)
+            depth = (int(water_depth) / row_video_duration) * (n)
             sheet_depth_fish.append([n, count, depth])
             n += 1
 
@@ -83,7 +83,7 @@ def out_put_result(base_path, total_frame, fps, duration, depth):
 
         # 过滤掉相同的坐标
         unique_coordinates = list(set(coordinates_list))
-        depth = (water_depth / row_video_duration) * (time) * (current_ping)
+        depth = (int(water_depth) / row_video_duration) * (time) * (current_ping)
         # 将这些坐标作为一类，导出到新的 3D_coordinates.xlsx 文件
         sheet_3d_coordinates.append([f'{current_ping}', count, depth, str(unique_coordinates)])
 
