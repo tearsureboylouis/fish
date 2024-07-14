@@ -72,6 +72,11 @@ class ProcessingWindowUI(object):
         self.horizontalLayout.setSpacing(10)
         self.horizontalLayout.setObjectName(u"horizontalLayout")
         self.horizontalLayout.setContentsMargins(-1, 10, -1, -1)
+        self.label = QLabel(Form)
+        self.label.setObjectName(u"label")
+
+        self.horizontalLayout.addWidget(self.label)
+
         self.horizontalSpacer = QSpacerItem(40, 20, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
 
         self.horizontalLayout.addItem(self.horizontalSpacer)
@@ -89,7 +94,7 @@ class ProcessingWindowUI(object):
 
         self.pushButton_cencel = QPushButton(Form)
         self.pushButton_cencel.setObjectName(u"pushButton_cencel")
-        self.pushButton_cencel.setEnabled(False)
+        self.pushButton_cencel.setEnabled(True)
         self.pushButton_cencel.setMinimumSize(QSize(0, 30))
 
         self.horizontalLayout.addWidget(self.pushButton_cencel)
@@ -107,6 +112,7 @@ class ProcessingWindowUI(object):
     def retranslateUi(self, Form):
         Form.setWindowTitle(QCoreApplication.translate("Form", u"Form", None))
         self.label_process.setText(QCoreApplication.translate("Form", u"\u8bf7\u70b9\u51fb\u5f00\u59cb", None))
+        self.label.setText(QCoreApplication.translate("Form", u"", None))
         self.pushButton_finish.setText(QCoreApplication.translate("Form", u"\u5f00\u59cb", None))
         self.pushButton_cencel.setText(QCoreApplication.translate("Form", u"\u53d6\u6d88", None))
     # retranslateUi

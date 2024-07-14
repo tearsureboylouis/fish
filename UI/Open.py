@@ -198,6 +198,7 @@ class OpenWindow(object):
         self.verticalLayout_2.setObjectName(u"verticalLayout_2")
         self.verticalLayout_2.setContentsMargins(10, 10, 10, 10)
         self.verticalLayout_4 = QVBoxLayout()
+        self.verticalLayout_4.setSpacing(0)
         self.verticalLayout_4.setObjectName(u"verticalLayout_4")
         self.label_project_setting = QLabel(self.recordingPage)
         self.label_project_setting.setObjectName(u"label_project_setting")
@@ -257,11 +258,11 @@ class OpenWindow(object):
         self.gridLayout_4.setObjectName(u"gridLayout_4")
         self.gridLayout_4.setVerticalSpacing(10)
         self.gridLayout_4.setContentsMargins(10, 10, 10, 10)
-        self.label_body_r = QLabel(self.recordingPage)
-        self.label_body_r.setObjectName(u"label_body_r")
-        self.label_body_r.setFont(font1)
+        self.comboBox_body_r = QComboBox(self.recordingPage)
+        self.comboBox_body_r.setObjectName(u"comboBox_body_r")
+        self.comboBox_body_r.setMinimumSize(QSize(0, 30))
 
-        self.gridLayout_4.addWidget(self.label_body_r, 0, 0, 1, 1)
+        self.gridLayout_4.addWidget(self.comboBox_body_r, 0, 1, 1, 1)
 
         self.label_water_deep_r = QLabel(self.recordingPage)
         self.label_water_deep_r.setObjectName(u"label_water_deep_r")
@@ -275,11 +276,20 @@ class OpenWindow(object):
 
         self.gridLayout_4.addWidget(self.lineEdit_water_deep_r, 1, 1, 1, 1)
 
-        self.comboBox_body_r = QComboBox(self.recordingPage)
-        self.comboBox_body_r.setObjectName(u"comboBox_body_r")
-        self.comboBox_body_r.setMinimumSize(QSize(0, 30))
+        self.label_body_r = QLabel(self.recordingPage)
+        self.label_body_r.setObjectName(u"label_body_r")
+        self.label_body_r.setFont(font1)
 
-        self.gridLayout_4.addWidget(self.comboBox_body_r, 0, 1, 1, 1)
+        self.gridLayout_4.addWidget(self.label_body_r, 0, 0, 1, 1)
+
+        self.pushButton_refresh = QPushButton(self.recordingPage)
+        self.pushButton_refresh.setObjectName(u"pushButton_refresh")
+        self.pushButton_refresh.setMinimumSize(QSize(30, 30))
+        icon4 = QIcon(QIcon.fromTheme(u"view-refresh"))
+        self.pushButton_refresh.setIcon(icon4)
+        self.pushButton_refresh.setIconSize(QSize(15, 15))
+
+        self.gridLayout_4.addWidget(self.pushButton_refresh, 0, 2, 1, 1)
 
         self.verticalLayout_4.addLayout(self.gridLayout_4)
 
@@ -289,7 +299,7 @@ class OpenWindow(object):
 
         self.gridLayout_6 = QGridLayout()
         self.gridLayout_6.setObjectName(u"gridLayout_6")
-        self.gridLayout_6.setContentsMargins(-1, -1, 10, -1)
+        self.gridLayout_6.setContentsMargins(-1, -1, 0, -1)
         self.pushButton_start_recording = QPushButton(self.recordingPage)
         self.pushButton_start_recording.setObjectName(u"pushButton_start_recording")
         self.pushButton_start_recording.setMinimumSize(QSize(100, 40))
@@ -452,8 +462,9 @@ class OpenWindow(object):
         self.label_project_name_r.setText(QCoreApplication.translate("Form", u"\u9879\u76ee\u540d\u79f0", None))
         self.pushButton_save_path_r.setText("")
         self.label_recording_setting.setText(QCoreApplication.translate("Form", u"\u5f55\u5236\u8bbe\u7f6e", None))
-        self.label_body_r.setText(QCoreApplication.translate("Form", u"\u5f55\u5236\u7a97\u4f53", None))
         self.label_water_deep_r.setText(QCoreApplication.translate("Form", u"\u6c34\u6df1\uff08cm\uff09", None))
+        self.label_body_r.setText(QCoreApplication.translate("Form", u"\u5f55\u5236\u7a97\u4f53", None))
+        self.pushButton_refresh.setText("")
         self.pushButton_start_recording.setText(QCoreApplication.translate("Form", u"\u5f00\u59cb\u5f55\u5236", None))
         self.label_7.setText(QCoreApplication.translate("Form", u"\u6700\u8fd1\u9879\u76ee", None))
         self.label_8.setText(QCoreApplication.translate("Form", u"\u6253\u5f00\u9879\u76ee", None))

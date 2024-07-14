@@ -1,3 +1,4 @@
+import math
 import shutil
 import sys
 import time
@@ -5,11 +6,12 @@ from datetime import datetime
 
 import numpy as np
 import pyautogui
+from pynput import keyboard
 
 from ultralytics import YOLO
 
 import cv2
-from PySide6.QtCore import Qt, QPoint, QSize, QThread, Signal, Slot, QTimer
+from PySide6.QtCore import Qt, QPoint, QSize, QThread, Signal, Slot, QTimer, QEvent
 from PySide6.QtGui import QFont, QCursor, QImage, QPixmap, QColor
 from PySide6.QtWidgets import QApplication, QWidget, QFileDialog, QMessageBox, QPushButton, QSizePolicy, QVBoxLayout, \
     QSpacerItem, QTableWidgetItem, QHBoxLayout, QTableWidget, QHeaderView, QLabel
@@ -65,9 +67,20 @@ class OpenProjectWindow(QWidget, OpenWindow):
         self.oldPos = event.globalPosition().toPoint()
 
     def mouseMoveEvent(self, event):
-        delta = QPoint(event.globalPosition().toPoint() - self.oldPos)
-        self.move(self.x() + delta.x(), self.y() + delta.y())
-        self.oldPos = event.globalPosition().toPoint()
+        try:
+            delta = QPoint(event.globalPosition().toPoint() - self.oldPos)
+            self.move(self.x() + delta.x(), self.y() + delta.y())
+            self.oldPos = event.globalPosition().toPoint()
+        except Exception:
+            pass
+
+    def eventFilter(self, source, event):
+        if event.type() == QEvent.MouseButtonPress and (self.processing or self.recordingWindow):
+            if self.processing.isActiveWindow():
+                self.processing.show()
+            elif self.recordingWindow.isActiveWindow():
+                self.recordingWindow.show()
+        return super().eventFilter(source, event)
 
     def recent_file(self):
         font1 = QFont()
@@ -189,6 +202,7 @@ class OpenProjectWindow(QWidget, OpenWindow):
         self.comboBox_body_r.currentTextChanged.connect(self.choose_window)
         # self.comboBox_body_r.activated.connect(self.init_combox)
         self.pushButton_start_recording.clicked.connect(self.start_recording)
+        self.pushButton_refresh.clicked.connect(self.refresh_combox)
 
     def new_project(self):
         self.pushButton_new_project.setProperty("class", "side_label side_label_click")
@@ -235,7 +249,9 @@ class OpenProjectWindow(QWidget, OpenWindow):
         self.lineEdit_video.setText(video)
 
     def finish(self):
+        global_dict['project_path'] = self.lineEdit_path.text()
         global_dict['project_name'] = self.lineEdit_name.text()
+        global_dict['project_video'] = self.lineEdit_video.text()
 
         if global_dict['project_name'] == "":
             QMessageBox.critical(self, "Error", "请输入项目名称!")
@@ -292,8 +308,6 @@ class OpenProjectWindow(QWidget, OpenWindow):
     def init_combox(self):
         windows = gw.getAllTitles()
         self.open_windows = [window for window in windows if window]
-        # if not self.comboBox_body_r.currentData():
-        #     self.comboBox_body_r.clear()
         for i in self.open_windows:
             if len(i) > 40:
                 self.comboBox_body_r.addItem(i[:30] + "...")
@@ -309,6 +323,16 @@ class OpenProjectWindow(QWidget, OpenWindow):
             return
         global_dict['project_path'] = path
         self.lineEdit_save_path_r.setText(path)
+
+    def refresh_combox(self):
+        self.comboBox_body_r.clear()
+        windows = gw.getAllTitles()
+        self.open_windows = [window for window in windows if window]
+        for i in self.open_windows:
+            if len(i) > 40:
+                self.comboBox_body_r.addItem(i[:30] + "...")
+            else:
+                self.comboBox_body_r.addItem(i)
 
     def start_recording(self):
         global_dict['project_name'] = self.lineEdit_project_name_r.text()
@@ -353,53 +377,69 @@ class VideoProcessingThread(QThread):
         第三步：计算与分析，并删除模型中的预测文件
         第四步：
         '''
-        # 获取视频的参数
-        cap = cv2.VideoCapture(self.video_path)
-        width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-        height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        global_dict['fps'] = fps = cap.get(cv2.CAP_PROP_FPS)
-        global_dict['total_frames'] = total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-        current_frame = 0
-        # 设置YOLO模型
-        model = YOLO(self.model_path)
+        try:
+            # 获取视频的参数
+            cap = cv2.VideoCapture(self.video_path)
+            width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+            height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+            global_dict['total_frames'] = total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+            global_dict['fps'] = fps = int(float(total_frames) / global_dict['duration'])
+            current_frame = 0
+            # 设置YOLO模型
+            model = YOLO(self.model_path)
 
-        video_path = os.path.join(global_dict['project_path'], global_dict['project_name'], 'video',
-                                  datetime.now().strftime('%Y%m%d') + '_' + global_dict[
-                                      'project_name'] + '_predict.mp4').replace('\\', "/")
-        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-        out = cv2.VideoWriter(video_path, fourcc, fps, (width, height))
+            video_path = os.path.join(global_dict['project_path'], global_dict['project_name'], 'video',
+                                      datetime.now().strftime('%Y%m%d') + '_' + global_dict[
+                                          'project_name'] + '_predict.mp4')
+            fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+            out = cv2.VideoWriter(video_path, fourcc, fps, (width, height))
 
-        # 读帧并识别
-        while self.is_running and current_frame < total_frames:
-            ret, frame = cap.read()
-            if not ret:
-                break
-            # 模型预测
-            results = model.predict(source=frame, save=True, save_txt=True)
-            # 写入帧到视频文件
-            save_path = os.path.join(global_dict['project_path'], global_dict['project_name'], 'data/metadata',
-                                     f"{current_frame}.txt")
-            results[0].save_txt(save_path)
-            out.write(results[0].plot())
-            current_frame += 1
-            progress = int((current_frame / total_frames) * 99)
-            self.update_progress.emit(progress)  # 更新进度条
-            window.processing.label_process.setText(f'正在处理第 {current_frame} 帧，共 {total_frames} 帧')
-        out.release()
-        cap.release()
+            self.start_time = time.time()
 
-        window.processing.label_process.setText('正在处理识别结果')
-        base_path = os.path.join(global_dict['project_path'], global_dict['project_name'], 'data')
-        out_put_result(base_path, int(total_frames), int(fps), global_dict['duration'], global_dict['water_depth'])
+            # 读帧并识别
+            while self.is_running and current_frame < total_frames:
+                ret, frame = cap.read()
+                if not ret:
+                    break
+                # 模型预测
+                results = model.predict(source=frame, save=True, save_txt=True, conf=0.6)
+                # 写入帧到视频文件
+                save_path = os.path.join(global_dict['project_path'], global_dict['project_name'], 'data/metadata',
+                                         f"{current_frame}.txt")
+                results[0].save_txt(save_path)
+                out.write(results[0].plot())
+                current_frame += 1
+                progress = int((current_frame / total_frames) * 99)
+                self.update_progress.emit(progress)  # 更新进度条
 
-        split_files(base_path)
-        cluster_layers(base_path, global_dict['duration'], global_dict['water_depth'])
+                if current_frame % 500 == 0:
+                    current_time = time.time()
+                    speed = current_frame / (current_time - self.start_time)
+                    rest_time = math.ceil((float(total_frames - current_frame) / speed) / 60.0)
+                    window.processing.label.setText(f"预计剩余 {rest_time} 分钟")
 
-        self.update_progress.emit(100)
-        window.processing.pushButton_finish.setText('完成')
-        window.processing.pushButton_finish.setEnabled(True)
-        window.processing.pushButton_cencel.setEnabled(False)
-        window.processing.label_process.setText('已完成')
+                window.processing.label_process.setText(f'正在处理第 {current_frame} 帧，共 {total_frames} 帧')
+            out.release()
+            cap.release()
+
+            window.processing.label_process.setText('正在处理识别结果')
+            window.processing.label.setText("")
+
+            base_path = os.path.join(global_dict['project_path'], global_dict['project_name'], 'data')
+            out_put_result(base_path, int(total_frames), int(fps), global_dict['duration'], global_dict['water_depth'])
+
+            split_files(base_path)
+            cluster_layers(base_path, global_dict['water_depth'], global_dict['duration'])
+
+            self.update_progress.emit(100)
+            window.processing.pushButton_finish.setText('完成')
+            window.processing.pushButton_finish.setEnabled(True)
+            window.processing.pushButton_cencel.setEnabled(False)
+            window.processing.label_process.setText('已完成')
+        finally:
+            base_path = os.path.join(global_dict['project_path'], global_dict['project_name'])
+            shutil.rmtree(base_path)
+            shutil.rmtree(os.path.join(global_dict['project_path'], 'runs'))
 
 
 class ProcessingWindow(QWidget, ProcessingWindowUI):
@@ -407,8 +447,20 @@ class ProcessingWindow(QWidget, ProcessingWindowUI):
         super().__init__()
         self.setupUi(self)
         self.setWindowFlag(Qt.FramelessWindowHint)
+        self.setWindowModality(Qt.ApplicationModal)
         self.thread = None
         self.bind()
+
+    def mousePressEvent(self, event):
+        self.oldPos = event.globalPosition().toPoint()
+
+    def mouseMoveEvent(self, event):
+        try:
+            delta = QPoint(event.globalPosition().toPoint() - self.oldPos)
+            self.move(self.x() + delta.x(), self.y() + delta.y())
+            self.oldPos = event.globalPosition().toPoint()
+        except Exception:
+            pass
 
     def bind(self):
         self.pushButton_finish.clicked.connect(self.finish)
@@ -431,9 +483,9 @@ class ProcessingWindow(QWidget, ProcessingWindowUI):
             self.close()
 
     def cancel(self):
-        self.thread.quit()
-        # 删除文件夹
-        # 删除xml
+        if self.thread:
+            self.thread.is_running = False
+            self.thread.quit()
         self.close()
         window.setEnabled(True)
 
@@ -458,7 +510,6 @@ class RecordingThread(QThread):
         current_frame = 0
         window.recordingWindow.label.setText('正在初始化中')
         window.recordingWindow.button_function.setEnabled(False)
-        window.recordingWindow.close_button.setEnabled(False)
         _window = gw.getWindowsWithTitle(global_dict['recording_window'])[0]
         fourcc = cv2.VideoWriter_fourcc(*'mp4v')
         x, y, width, height = _window.left + 10, _window.top + 50, _window.width - 20, _window.height - 60
@@ -479,7 +530,7 @@ class RecordingThread(QThread):
             frame_p = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
 
             # 进行模型的预测
-            results = model.predict(source=frame_p, save=True, save_txt=True)
+            results = model.predict(source=frame_p, save=True, save_txt=True, conf=0.6)
             self.predict_array.append(results[0].plot())
             save_path = os.path.join(global_dict['project_path'], global_dict['project_name'], 'data/metadata',
                                      f"{current_frame}.txt")
@@ -496,7 +547,7 @@ class RecordingThread(QThread):
                 _window.activate()
                 self.isFirst = False
                 self.start_time = time.time()
-                window.recordingWindow.button_function.setText("结束录制")
+                window.recordingWindow.button_function.setText("结束录制(F2)")
                 window.recordingWindow.button_function.setEnabled(True)
 
         window.recordingWindow.label.setText('正在处理数据中，请稍后…')
@@ -539,6 +590,17 @@ class RecordingWindow(QWidget):
 
         self.isFinish = False
 
+    def mousePressEvent(self, event):
+        self.oldPos = event.globalPosition().toPoint()
+
+    def mouseMoveEvent(self, event):
+        try:
+            delta = QPoint(event.globalPosition().toPoint() - self.oldPos)
+            self.move(self.x() + delta.x(), self.y() + delta.y())
+            self.oldPos = event.globalPosition().toPoint()
+        except Exception:
+            pass
+
     def setupUI(self):
         self.setWindowFlag(Qt.FramelessWindowHint)
 
@@ -560,7 +622,6 @@ class RecordingWindow(QWidget):
 
         self.close_button = QPushButton("x")
         self.close_button.setFixedSize(20, 20)
-        self.close_button.clicked.connect(lambda: self.window().close())  # 连接按钮的点击信号到窗口的close()方法
 
         # 将关闭按钮放在水平布局的右侧
         top_layout.addSpacing(20)
@@ -586,9 +647,16 @@ class RecordingWindow(QWidget):
 
     def bind(self):
         self.button_function.clicked.connect(self.functions)
+        self.close_button.clicked.connect(self.close_window)
 
     def init(self):
-        pass
+        def on_press(key):
+            if not self.isFinish:
+                if key == keyboard.Key.f2:
+                    self.isFinish = True
+
+        listener = keyboard.Listener(on_press=on_press)
+        listener.start()
 
     def run_recording(self):
         self.thread = RecordingThread()
@@ -596,8 +664,9 @@ class RecordingWindow(QWidget):
 
     def functions(self):
         if self.button_function.text() == "开始录制":
+            self.close_button.deleteLater()
             self.run_recording()
-        elif self.button_function.text() == "结束录制":
+        elif self.button_function.text() == "结束录制(F2)":
             self.isFinish = True
         elif self.button_function.text() == "完成":
             shutil.rmtree('runs')
@@ -607,6 +676,10 @@ class RecordingWindow(QWidget):
             window.other_window.show()
             window.close()
             self.close()
+
+    def close_window(self):
+        self.close()
+        window.setEnabled(True)
 
 
 class MainWindows(QWidget, MainWindow):
@@ -638,7 +711,7 @@ class MainWindows(QWidget, MainWindow):
         self.is_paused = False
         self.timer = QTimer()
         self.timer.timeout.connect(self.update_frame)
-        self.timer.start(int(1000 / self.PFS - 33))  # 程序运行需要30ms左右
+        self.timer.start(int(1000 / self.PFS))  # 程序运行需要30ms左右
 
         base_url = global_dict['xml_url'].split('output.xml')[0]
         layer_count, total_count = get_layers_data(base_url)
@@ -826,7 +899,6 @@ class TotalLayer(QWidget):
                     np.random.randint(100, 150)
                 )
                 self.layer_color = []
-                print(current_color.getRgb())
                 self.layer_color.append(current_color.getRgb())
                 last_layer = layer[i]
 
