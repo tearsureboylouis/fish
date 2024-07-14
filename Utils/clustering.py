@@ -3,6 +3,8 @@ import pandas as pd
 import numpy as np
 from sklearn.cluster import DBSCAN
 
+import torch
+
 
 #
 def split_files(base_path):
@@ -158,6 +160,7 @@ def add_result(layer_count, total_count, file_path, depth, duration):
     """
     用于输出每一层的数据到Xml文件中
     """
+
     tree = ET.parse(file_path)
     root = tree.getroot()
 
@@ -171,8 +174,10 @@ def add_result(layer_count, total_count, file_path, depth, duration):
     parameter = root.find('parameter')
     _water_depth = ET.SubElement(parameter, "waterDepth")
     _water_depth.text = str(depth)
+
     _water_depth = ET.SubElement(parameter, "Duration")
     _water_depth.text = str(duration)
+
     tree.write(file_path, encoding="utf-8", xml_declaration=True)
 
 

@@ -29,6 +29,7 @@ from Utils.saveInfo import save_project_info
 from Utils.output_yolo_result import *
 from Utils.clustering import split_files, cluster_layers
 from Utils.visualization import *
+from Utils.CNN_Predict import FishCNN
 
 rcParams['font.family'] = 'Microsoft YaHei'  # 设置字体为微软雅黑
 rcParams['axes.unicode_minus'] = False  # 正确显示负号
@@ -402,7 +403,7 @@ class VideoProcessingThread(QThread):
                 if not ret:
                     break
                 # 模型预测
-                results = model.predict(source=frame, save=True, save_txt=True, conf=0.6)
+                results = model.predict(source=frame, save=True, save_txt=True)
                 # 写入帧到视频文件
                 save_path = os.path.join(global_dict['project_path'], global_dict['project_name'], 'data/metadata',
                                          f"{current_frame}.txt")
@@ -429,7 +430,7 @@ class VideoProcessingThread(QThread):
             out_put_result(base_path, int(total_frames), int(fps), global_dict['duration'], global_dict['water_depth'])
 
             split_files(base_path)
-            cluster_layers(base_path, global_dict['water_depth'], global_dict['duration'])
+            cluster_layers(base_path, global_dict['water_depth'], global_dict['duration'], )
 
             self.update_progress.emit(100)
             window.processing.pushButton_finish.setText('完成')
@@ -530,7 +531,7 @@ class RecordingThread(QThread):
             frame_p = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
 
             # 进行模型的预测
-            results = model.predict(source=frame_p, save=True, save_txt=True, conf=0.6)
+            results = model.predict(source=frame_p, save=True, save_txt=True)
             self.predict_array.append(results[0].plot())
             save_path = os.path.join(global_dict['project_path'], global_dict['project_name'], 'data/metadata',
                                      f"{current_frame}.txt")
