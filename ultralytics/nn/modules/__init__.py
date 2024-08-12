@@ -156,5 +156,6 @@ __all__ = (
     "SimSPPF",
     "VoVGSCSP",
     "VoVGSCSPC",
-    "GSConv"
+    "GSConv",
+    "space_to_depth"
 )

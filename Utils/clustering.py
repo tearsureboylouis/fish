@@ -4,9 +4,11 @@ import numpy as np
 from sklearn.cluster import DBSCAN
 
 import torch
+import xml.etree.ElementTree as ET
+
+all_data = []
 
 
-#
 def split_files(base_path):
     """
     每次将从小数点前数字为 m 的行到 n 的行的所有数据提取并保存到一个新的 Excel 文件中，并保存到m_10cm_n文件夹中
@@ -108,24 +110,30 @@ def cluster_layers(base_path, water_depth, duration):
                 cluster_centers.append(center)
 
             # 输出每个簇的中心点坐标
-            # add_coordinate(index, num, x, y, z, file_path)
             for i, center in enumerate(cluster_centers):
-                add_coordinate(layer, i + 1, center[0], center[1], center[2], xml_path)
+                all_data.append([layer, (center[0], center[1], center[2])])
+                # add_coordinate(layer, i + 1, center[0], center[1], center[2], xml_path)
+
             # 绘制噪声点
             noise_points = coordinates_3d[labels == -1]
 
-            total_fish_count += (len(cluster_centers) + len(noise_points))
-            each_layer_count.append(len(cluster_centers) + len(noise_points))
+            # # 移除重复点
+            # total_fish_count += (len(cluster_centers) + len(noise_points))
+            # each_layer_count.append(len(cluster_centers) + len(noise_points))
 
         # 更新 m 和 n
         deep_from += 25
         deep_to += 25
         layer += 1
 
+    data = combine_point(combine_data())
+
+    for i in data:
+        total_fish_count += len(i)
+        each_layer_count.append(len(i))
+
+    add_coordinate(data, xml_path)
     add_result(each_layer_count, total_fish_count, xml_path, water_depth, duration)
-
-
-import xml.etree.ElementTree as ET
 
 
 def init_file(file_path):
@@ -158,7 +166,7 @@ def init_file(file_path):
 
 def add_result(layer_count, total_count, file_path, depth, duration):
     """
-    用于输出每一层的数据到Xml文件中
+    用于总数据到Xml文件中
     """
 
     tree = ET.parse(file_path)
@@ -181,21 +189,64 @@ def add_result(layer_count, total_count, file_path, depth, duration):
     tree.write(file_path, encoding="utf-8", xml_declaration=True)
 
 
-def add_coordinate(layer_num, cluster_num, x, y, z, file_path):
+def add_coordinate(data, file_path):
     tree = ET.parse(file_path)
     root = tree.getroot()
 
-    coordinate = root.find('coordinate')
-    layer = ET.SubElement(coordinate, f"layer{layer_num}")
+    for index in range(len(data)):
+        for point in data[index]:
+            coordinate = root.find('coordinate')
+            layer = ET.SubElement(coordinate, f"layer{index + 1}")
 
-    cluster = ET.SubElement(layer, "cluster")
-    cluster.text = str(cluster_num)
+            cluster = ET.SubElement(layer, "cluster")
+            cluster.text = str(point)
 
-    _x = ET.SubElement(layer, "x")
-    _x.text = str(x)
-    _y = ET.SubElement(layer, "y")
-    _y.text = str(y)
-    _z = ET.SubElement(layer, "z")
-    _z.text = str(z)
+            _x = ET.SubElement(layer, "x")
+            _x.text = str(point[0])
+            _y = ET.SubElement(layer, "y")
+            _y.text = str(point[1])
+            _z = ET.SubElement(layer, "z")
+            _z.text = str(point[2])
 
     tree.write(file_path, encoding="utf-8", xml_declaration=True)
+
+
+def combine_data():
+    classified_data = {}
+    data = []
+    for item in all_data:
+        key = item[0]
+        value = item[1]
+
+        if key not in classified_data:
+            classified_data[key] = []
+        classified_data[key].append(value)
+
+    for value in classified_data.values():
+        data.append(value)
+
+    return data
+
+
+def combine_point(data):
+    temp = []
+    for index in range(len(data) - 1):
+        data_1 = data[index]
+        data_2 = data[index + 1]
+        if not data_1:
+            temp.append([])
+        elif not data_2:
+            temp.append(data_1)
+        else:
+            layer = []
+            for i in data_1:
+                flag = True
+                for j in data_2:
+                    if ((i[0] - j[0]) ** 2 + (i[1] - j[1]) ** 2 + (i[2] - j[2]) ** 2) ** 0.5 < 5:
+                        flag = False
+                        break
+                if flag:
+                    layer.append(i)
+            temp.append(layer)
+    temp.append(data[-1])
+    return temp

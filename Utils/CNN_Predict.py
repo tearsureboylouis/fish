@@ -114,3 +114,7 @@ for epoch in range(num_epochs):
     avg_loss = total_loss / len(train_loader)
     if (epoch + 1) % 100 == 0:
         print(f'Epoch [{epoch + 1}/{num_epochs}], Loss: {avg_loss:.4f}')
+
+model.eval()
+with torch.no_grad():
+    new_observations = torch.FloatTensor(observations).unsqueeze(1)

@@ -50,7 +50,8 @@ __all__ = (
     "PSA",
     "SCDown",
     "SimSPPF",
-    "GSBottleneck"
+    "GSBottleneck",
+    "space_to_depth"
 )
 
 
@@ -440,7 +441,7 @@ class MaxSigmoidAttnBlock(nn.Module):
 
         aw = torch.einsum("bmchw,bnmc->bmhwn", embed, guide)
         aw = aw.max(dim=-1)[0]
-        aw = aw / (self.hc**0.5)
+        aw = aw / (self.hc ** 0.5)
         aw = aw + self.bias[None, :, None, None]
         aw = aw.sigmoid() * self.scale
 
@@ -504,7 +505,7 @@ class ImagePoolingAttn(nn.Module):
         """Executes attention mechanism on input tensor x and guide tensor."""
         bs = x[0].shape[0]
         assert len(x) == self.nf
-        num_patches = self.k**2
+        num_patches = self.k ** 2
         x = [pool(proj(x)).view(bs, -1, num_patches) for (x, proj, pool) in zip(x, self.projections, self.im_pools)]
         x = torch.cat(x, dim=-1).transpose(1, 2)
         q = self.query(text)
@@ -517,7 +518,7 @@ class ImagePoolingAttn(nn.Module):
         v = v.reshape(bs, -1, self.nh, self.hc)
 
         aw = torch.einsum("bnmc,bkmc->bmnk", q, k)
-        aw = aw / (self.hc**0.5)
+        aw = aw / (self.hc ** 0.5)
         aw = F.softmax(aw, dim=-1)
 
         x = torch.einsum("bmnk,bkmc->bnmc", aw, v)
@@ -858,7 +859,7 @@ class Attention(nn.Module):
         self.num_heads = num_heads
         self.head_dim = dim // num_heads
         self.key_dim = int(self.head_dim * attn_ratio)
-        self.scale = self.key_dim**-0.5
+        self.scale = self.key_dim ** -0.5
         nh_kd = nh_kd = self.key_dim * num_heads
         h = dim + nh_kd * 2
         self.qkv = Conv(dim, h, 1, act=False)
@@ -963,6 +964,7 @@ class SCDown(nn.Module):
 
 class SimConv(nn.Module):
     '''Normal Conv with ReLU activation'''
+
     def __init__(self, in_channels, out_channels, kernel_size, stride, groups=1, bias=False):
         super().__init__()
         padding = kernel_size // 2
@@ -984,8 +986,10 @@ class SimConv(nn.Module):
     def forward_fuse(self, x):
         return self.act(self.conv(x))
 
+
 class SimSPPF(nn.Module):
     '''Simplified SPPF with ReLU activation'''
+
     def __init__(self, in_channels, out_channels, kernel_size=5):
         super().__init__()
         c_ = in_channels // 2  # hidden channels
@@ -1061,6 +1065,7 @@ class DWConv(Conv):
     def __init__(self, c1, c2, k=1, s=1, act=True):  # ch_in, ch_out, kernel, stride, padding, groups
         super().__init__(c1, c2, k, s, g=math.gcd(c1, c2), act=act)
 
+
 class GSBottleneck(nn.Module):
     # GS Bottleneck https://github.com/AlanLi1997/slim-neck-by-gsconv
     def __init__(self, c1, c2, k=3, s=1):
@@ -1078,6 +1083,7 @@ class GSBottleneck(nn.Module):
 
     def forward(self, x):
         return self.conv_lighting(x) + self.shortcut(x)
+
 
 class VoVGSCSP(nn.Module):
     # VoV-GSCSP https://github.com/AlanLi1997/slim-neck-by-gsconv
@@ -1101,10 +1107,11 @@ class VoVGSCSPC(VoVGSCSP):
         self.gsb = GSBottleneck(c_, c_, 1, 1)
 
 
+class space_to_depth(nn.Module):
+    # Changing the dimension of the Tensor
+    def __init__(self, dimension=1):
+        super().__init__()
+        self.d = dimension
 
-
-
-
-
-
-
+    def forward(self, x):
+        return torch.cat([x[..., ::2, ::2], x[..., 1::2, ::2], x[..., ::2, 1::2], x[..., 1::2, 1::2]], 1)

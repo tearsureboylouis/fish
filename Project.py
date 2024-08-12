@@ -27,9 +27,10 @@ from UI.processing import ProcessingWindowUI
 from UI.main import MainWindow
 from Utils.saveInfo import save_project_info
 from Utils.output_yolo_result import *
-from Utils.clustering import split_files, cluster_layers
+from Utils.clustering import split_files, cluster_layers, combine_data
 from Utils.visualization import *
-from Utils.CNN_Predict import FishCNN
+
+# from Utils.CNN_Predict import FishCNN
 
 rcParams['font.family'] = 'Microsoft YaHei'  # 设置字体为微软雅黑
 rcParams['axes.unicode_minus'] = False  # 正确显示负号
@@ -273,8 +274,7 @@ class OpenProjectWindow(QWidget, OpenWindow):
 
         # 复制视频文件
         new_file_name = os.path.join(global_dict['project_path'], global_dict['project_name'], 'video',
-                                     datetime.now().strftime('%Y%m%d') + '_' + global_dict[
-                                         'project_name'] + '_row.mp4')
+                                     datetime.now().strftime('%Y%m%d') + '_' + global_dict['project_name'] + '_row.mp4')
         shutil.copy(global_dict['project_video'], new_file_name)
         global_dict['project_video'] = new_file_name
         global_dict['water_depth'] = float(self.lineEdit_water_depth.text())
@@ -376,7 +376,7 @@ class VideoProcessingThread(QThread):
         第一步：创建工程文件夹和工程文件
         第二步：识别并生成标签和视频
         第三步：计算与分析，并删除模型中的预测文件
-        第四步：
+        第四步：进行神经网络的识别
         '''
         try:
             # 获取视频的参数
@@ -513,12 +513,14 @@ class RecordingThread(QThread):
         window.recordingWindow.button_function.setEnabled(False)
         _window = gw.getWindowsWithTitle(global_dict['recording_window'])[0]
         fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-        x, y, width, height = _window.left + 10, _window.top + 50, _window.width - 20, _window.height - 60
+        x, y, width, height = _window.left + 10, _window.top + 70, _window.width - 20, _window.height - 70
         model = YOLO('_internal/static/best.pt')
 
         if _window.isMinimized:  # 如果窗口最小化了，则先恢复
             _window.restore()
         _window.activate()  # 激活窗口，使其获得焦点
+
+        pyautogui.PAUSE = 0.05
 
         while not window.recordingWindow.isFinish:
             # 窗口的坐标和尺寸
@@ -531,13 +533,17 @@ class RecordingThread(QThread):
             frame_p = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
 
             # 进行模型的预测
-            results = model.predict(source=frame_p, save=True, save_txt=True)
+            results = model.predict(source=frame_p, save=True, save_txt=True, conf=0.5)
             self.predict_array.append(results[0].plot())
             save_path = os.path.join(global_dict['project_path'], global_dict['project_name'], 'data/metadata',
                                      f"{current_frame}.txt")
             results[0].save_txt(save_path)
             current_frame += 1
             if self.isFirst:
+                current_frame = 0
+                self.row_array = []
+                self.predict_array = []
+
                 window.recordingWindow.label.setText('请确保录制窗口无遮挡，3秒后开始录制')
                 time.sleep(1)
                 window.recordingWindow.label.setText('请确保录制窗口无遮挡，2秒后开始录制')
@@ -557,9 +563,9 @@ class RecordingThread(QThread):
         global_dict['duration'] = int(self.start_time - time.time())
         fps = float(len(self.row_array)) / (time.time() - self.start_time)
         self.row_video = cv2.VideoWriter(global_dict['project_video'], fourcc, fps,
-                                         (_window.width - 20, _window.height - 60))
+                                         (_window.width - 20, _window.height - 70))
         self.predict_video = cv2.VideoWriter(global_dict['project_video'][:-7] + 'predict.mp4', fourcc, fps,
-                                             (_window.width - 20, _window.height - 60))
+                                             (_window.width - 20, _window.height - 70))
         for frame in self.row_array:
             frame_1 = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
             self.row_video.write(frame_1)
