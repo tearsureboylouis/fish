@@ -2,9 +2,12 @@ import os
 import pandas as pd
 import numpy as np
 from sklearn.cluster import DBSCAN
+from shapely.geometry import Point, Polygon
 
 import torch
 import xml.etree.ElementTree as ET
+
+from pages.global_dict import global_dict
 
 all_data = []
 
@@ -126,7 +129,7 @@ def cluster_layers(base_path, water_depth, duration):
         deep_to += 25
         layer += 1
 
-    data = combine_point(combine_data())
+    data = erase_edge(combine_point(combine_data()))
 
     for i in data:
         total_fish_count += len(i)
@@ -250,3 +253,29 @@ def combine_point(data):
             temp.append(layer)
     temp.append(data[-1])
     return temp
+
+
+def erase_edge(data):
+    if global_dict['edge']:
+        polygon = Polygon(global_dict['edge'])
+    else:
+        return data
+
+    temp = []
+
+    for layer in range(len(data)):
+        layer_temp = []
+        for point in data[layer]:
+            point_xy = Point(point[0], point[1])
+            print(point_xy)
+            if polygon.contains(point_xy):
+                layer_temp.append(point)
+        temp.append(layer_temp)
+    return temp
+
+
+import ast
+
+str1 = "[(123,234),(345,456)]"
+list1 = ast.literal_eval(str1)
+print(list1[0])

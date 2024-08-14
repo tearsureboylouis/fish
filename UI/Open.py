@@ -423,14 +423,14 @@ class OpenWindow(object):
         self.frame_footer.setBaseSize(QSize(0, 0))
         self.frame_footer.setFrameShape(QFrame.Shape.StyledPanel)
         self.frame_footer.setFrameShadow(QFrame.Shadow.Raised)
-        self.Version = QLabel(self.frame_footer)
+        self.Version = QPushButton(self.frame_footer)
         self.Version.setObjectName(u"Version")
         self.Version.setGeometry(QRect(540, 10, 51, 21))
         font2 = QFont()
         font2.setPointSize(9)
         font2.setKerning(True)
         self.Version.setFont(font2)
-        self.Version.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        # self.Version.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         self.verticalLayout.addWidget(self.frame_footer)
 

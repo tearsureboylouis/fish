@@ -30,24 +30,14 @@ from Utils.output_yolo_result import *
 from Utils.clustering import split_files, cluster_layers, combine_data
 from Utils.visualization import *
 
+from pages.window_setting import ImageWindow
+
+from pages.global_dict import global_dict
+
 # from Utils.CNN_Predict import FishCNN
 
 rcParams['font.family'] = 'Microsoft YaHei'  # 设置字体为微软雅黑
 rcParams['axes.unicode_minus'] = False  # 正确显示负号
-
-global_dict = {
-    'path': './_internal/static/ex.xml',
-    'project_video': '',
-    'project_name': '',
-    'project_path': '',
-    'FPS': '',
-    'total_frame': '',
-    'water_layer': 0,
-    'xml_url': '',
-    'water_depth': 0.0,
-    'duration': 0.0,
-    'recording_window': ''
-}
 
 
 class OpenProjectWindow(QWidget, OpenWindow):
@@ -59,6 +49,7 @@ class OpenProjectWindow(QWidget, OpenWindow):
         self.other_window = other
         self.processing = ProcessingWindow()
         self.recordingWindow = RecordingWindow()
+        self.setting_edge = ImageWindow()
 
         self.set_style()
         self.bind()
@@ -199,6 +190,7 @@ class OpenProjectWindow(QWidget, OpenWindow):
         self.pushButton_choose_xml.clicked.connect(self.choose_xml)
         self.pushButton.clicked.connect(self.open_xml)
         self.pushButton_recording.clicked.connect(self.recording)
+        self.Version.clicked.connect(self.edge_setting)
 
         self.pushButton_save_path_r.clicked.connect(self.save_path_r)
         self.comboBox_body_r.currentTextChanged.connect(self.choose_window)
@@ -360,6 +352,14 @@ class OpenProjectWindow(QWidget, OpenWindow):
         self.recordingWindow.show()
         self.setEnabled(False)
 
+    def edge_setting(self):
+        _window = gw.getWindowsWithTitle('20240801')
+        if _window:
+            self.setting_edge.reload()
+            self.setting_edge.show()
+        else:
+            QMessageBox.critical(self, '错误', '未找到指定窗口！')
+
 
 class VideoProcessingThread(QThread):
     update_progress = Signal(int)
@@ -513,7 +513,8 @@ class RecordingThread(QThread):
         window.recordingWindow.button_function.setEnabled(False)
         _window = gw.getWindowsWithTitle(global_dict['recording_window'])[0]
         fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-        x, y, width, height = _window.left + 10, _window.top + 70, _window.width - 20, _window.height - 70
+        region = (_window.left + global_dict['window_offset'][0],
+                  _window.top + global_dict['window_offset'][1], 800, 600)
         model = YOLO('_internal/static/best.pt')
 
         if _window.isMinimized:  # 如果窗口最小化了，则先恢复
@@ -526,14 +527,14 @@ class RecordingThread(QThread):
             # 窗口的坐标和尺寸
 
             # 使用pyautogui捕获指定区域的屏幕
-            screenshot = pyautogui.screenshot(region=(x, y, width, height))
+            screenshot = pyautogui.screenshot(region=region)
             frame = np.array(screenshot)
             self.row_array.append(frame)
 
             frame_p = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
 
             # 进行模型的预测
-            results = model.predict(source=frame_p, save=True, save_txt=True, conf=0.5)
+            results = model.predict(source=frame_p, save=True, save_txt=True, conf=0.4)
             self.predict_array.append(results[0].plot())
             save_path = os.path.join(global_dict['project_path'], global_dict['project_name'], 'data/metadata',
                                      f"{current_frame}.txt")
@@ -563,9 +564,9 @@ class RecordingThread(QThread):
         global_dict['duration'] = int(self.start_time - time.time())
         fps = float(len(self.row_array)) / (time.time() - self.start_time)
         self.row_video = cv2.VideoWriter(global_dict['project_video'], fourcc, fps,
-                                         (_window.width - 20, _window.height - 70))
+                                         (800, 600))
         self.predict_video = cv2.VideoWriter(global_dict['project_video'][:-7] + 'predict.mp4', fourcc, fps,
-                                             (_window.width - 20, _window.height - 70))
+                                             (800, 600))
         for frame in self.row_array:
             frame_1 = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
             self.row_video.write(frame_1)
