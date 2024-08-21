@@ -10,6 +10,7 @@ global_dict = {
     'water_depth': 0.0,
     'duration': 0.0,
     'recording_window': '',
-    'window_offset': [8, 50, 800, 600],
-    'edge': []
+    'window_offset': [12, 75, 800, 600],
+    'edge': [],
+    'key': False
 }

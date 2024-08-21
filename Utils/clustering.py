@@ -258,6 +258,7 @@ def combine_point(data):
 def erase_edge(data):
     if global_dict['edge']:
         polygon = Polygon(global_dict['edge'])
+        # print(global_dict['edge'])
     else:
         return data
 
@@ -267,15 +268,10 @@ def erase_edge(data):
         layer_temp = []
         for point in data[layer]:
             point_xy = Point(point[0], point[1])
-            print(point_xy)
+            # print(point_xy)
+            # print(polygon)
+            print(polygon.contains(point_xy))
             if polygon.contains(point_xy):
                 layer_temp.append(point)
         temp.append(layer_temp)
     return temp
-
-
-import ast
-
-str1 = "[(123,234),(345,456)]"
-list1 = ast.literal_eval(str1)
-print(list1[0])

@@ -431,7 +431,11 @@ class OpenWindow(object):
         font2.setKerning(True)
         self.Version.setFont(font2)
         # self.Version.setAlignment(Qt.AlignmentFlag.AlignCenter)
-
+        self.edge_setting_btn = QPushButton(self.frame_footer)
+        self.edge_setting_btn.setObjectName("edge_setting")
+        self.edge_setting_btn.setGeometry(QRect(10, 10, 51, 21))
+        self.edge_setting_btn.setFont(font2)
+        self.edge_setting_btn.setText('设置')
         self.verticalLayout.addWidget(self.frame_footer)
 
         self.gridLayout_2.addWidget(self.main_window, 0, 0, 1, 1)

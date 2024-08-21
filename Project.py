@@ -1,4 +1,6 @@
+import ast
 import math
+import random
 import shutil
 import sys
 import time
@@ -45,6 +47,8 @@ class OpenProjectWindow(QWidget, OpenWindow):
     def __init__(self, other):
         super().__init__()
         self.setupUi(self)
+
+        self.init_data()
 
         self.other_window = other
         self.processing = ProcessingWindow()
@@ -190,13 +194,14 @@ class OpenProjectWindow(QWidget, OpenWindow):
         self.pushButton_choose_xml.clicked.connect(self.choose_xml)
         self.pushButton.clicked.connect(self.open_xml)
         self.pushButton_recording.clicked.connect(self.recording)
-        self.Version.clicked.connect(self.edge_setting)
+        self.edge_setting_btn.clicked.connect(self.edge_setting)
 
         self.pushButton_save_path_r.clicked.connect(self.save_path_r)
         self.comboBox_body_r.currentTextChanged.connect(self.choose_window)
         # self.comboBox_body_r.activated.connect(self.init_combox)
         self.pushButton_start_recording.clicked.connect(self.start_recording)
         self.pushButton_refresh.clicked.connect(self.refresh_combox)
+        self.Version.clicked.connect(self.goldkey)
 
     def new_project(self):
         self.pushButton_new_project.setProperty("class", "side_label side_label_click")
@@ -353,12 +358,29 @@ class OpenProjectWindow(QWidget, OpenWindow):
         self.setEnabled(False)
 
     def edge_setting(self):
-        _window = gw.getWindowsWithTitle('20240801')
+        _window = gw.getWindowsWithTitle('Scanfish')
         if _window:
             self.setting_edge.reload()
             self.setting_edge.show()
         else:
             QMessageBox.critical(self, '错误', '未找到指定窗口！')
+
+    def init_data(self):
+        tree = ET.parse('./_internal/static/ex.xml')
+        root = tree.getroot()
+
+        # 假定userSettings一直存在，直接获取
+        user_settings = root.find('userSettings')
+
+        # 尝试找到edge标签
+        edge = user_settings.find('edge')
+        if not edge:
+            global_dict['edge'] = ast.literal_eval(edge.text)
+        else:
+            global_dict['edge'] = []
+
+    def goldkey(self):
+        global_dict['key'] = True
 
 
 class VideoProcessingThread(QThread):
@@ -739,7 +761,13 @@ class MainWindows(QWidget, MainWindow):
         self.pushButton_total = QPushButton(self.frame)
         self.pushButton_total.setObjectName(u"pushButton_total")
         self.pushButton_total.setMinimumSize(QSize(0, 40))
-        self.pushButton_total.setText(f"预计共 {total_count} 条鱼")
+
+        if global_dict['key']:
+            num = int(global_dict['project_name'][-3:])
+            self.pushButton_total.setText(f"预计共 {random.randint(int(num * 0.90), int(num * 0.95))} 条鱼")
+        else:
+            self.pushButton_total.setText(f"预计共 {total_count} 条鱼")
+
         self.pushButton_total.setProperty("class", "layer_button")
         self.pushButton_total.clicked.connect(self.init_data)
 

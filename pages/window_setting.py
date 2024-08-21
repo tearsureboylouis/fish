@@ -8,6 +8,7 @@ from PySide6.QtGui import QImage, QPixmap
 from PySide6.QtCore import Qt
 import keyboard
 import pygetwindow as gw
+import xml.etree.ElementTree as ET
 
 from pages.global_dict import global_dict
 
@@ -83,7 +84,6 @@ class ImageWindow(QWidget):
             # 三个或更多点，绘制多边形
             pts = np.array(self.points, np.int32).reshape((-1, 1, 2))
             cv2.polylines(self.image, [pts], isClosed=True, color=(0, 255, 0), thickness=2)
-            print(self.points)
         self.refresh_image()
 
     def reset(self):
@@ -105,13 +105,27 @@ class ImageWindow(QWidget):
                 temp.append(((point[0] * scale) - (width / 2), -((point[1] * scale) - (height / 2))))
             global_dict['edge'] = temp
 
+            tree = ET.parse('./_internal/static/ex.xml')
+            root = tree.getroot()
+
+            user_settings = root.find('userSettings')
+            edge = user_settings.find('edge')
+            if edge is None:
+                # 如果没有edge标签，创建一个
+                edge = ET.SubElement(user_settings, 'edge')
+
+            # 设置或更新edge的值
+            edge.text = str(temp)
+
+            # 保存更改到文件
+            tree.write('./_internal/static/ex.xml')
+
     def reload(self):
-        # 获取窗口，截取窗口，加载图像 20240801
-        _window = gw.getWindowsWithTitle('20240801')
+        # 获取窗口，截取窗口，加载图像
+        _window = gw.getWindowsWithTitle('Scanfish')
         if not _window:
             QMessageBox.critical(self, '错误', '未找到指定窗口！')
         else:
-            self.points = []
             _window = _window[0]
             screenshot = pyautogui.screenshot(
                 region=(
@@ -119,4 +133,19 @@ class ImageWindow(QWidget):
                     600))
             self.original_image = cv2.cvtColor(np.array(screenshot), cv2.COLOR_BGR2RGB)
             self.image = self.original_image.copy()
+
+            if global_dict['edge']:
+                height = self.image.shape[0]
+                width = self.image.shape[1]
+                scale = height / 600
+                for point in global_dict['edge']:
+                    x = (int(point[0]) + (width / 2)) / scale
+                    y = (-int(point[1]) + (height / 2)) / scale
+                    self.points.append((x, y))
+            else:
+                self.points = []
+
+            pts = np.array(self.points, np.int32).reshape((-1, 1, 2))
+            cv2.polylines(self.image, [pts], isClosed=True, color=(0, 255, 0), thickness=2)
+
             self.refresh_image()
